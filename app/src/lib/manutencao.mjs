@@ -23,6 +23,13 @@ export async function invalidar(db, autos, motivo = "Inválido"){
   return atualizarStatusEmLote(db, autos, motivo);
 }
 
+// Define a matrícula do motorista de UMA multa (correção manual quando o match
+// automático falha por homônimo ou typo no nome da Base Motoristas). Não altera status.
+export async function definirMatricula(db, auto, matricula){
+  await db._patch("multas_antt", `autoInfracao=eq.${encodeURIComponent(auto)}`, { matriculaMotorista: String(matricula) });
+  return { auto, matricula: String(matricula) };
+}
+
 // Atualiza status por ID (UUID único) — preciso quando há duplicatas do mesmo auto.
 export async function marcarPorId(db, ids, novoStatus, { lote = 100 } = {}){
   let total = 0;

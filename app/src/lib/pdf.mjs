@@ -89,6 +89,13 @@ function fieldsFromText(text){
     const semNum = semNumero(lines[i]);
     let chave = chaveDoRotulo(semNum, jaVistas);
     if(chave){ jaVistas.add(chave); marks.push({ i, chave }); }
+    else if(/^\d{1,2}\s*[-–]\s+\S/.test(lines[i])){
+      // Rótulo NUMERADO desconhecido (ex.: "18 - ENDEREÇO", "19 - BAIRRO", que
+      // aparecem na seção LOCAL DA INFRAÇÃO de PDFs de algumas regiões/Maceió).
+      // Não é um campo que usamos, mas PRECISA delimitar o valor do campo anterior,
+      // senão o município "vaza" e captura o texto seguinte. Chave única descartável.
+      marks.push({ i, chave: "__OUTRO__" + i });
+    }
   }
   const out = {};
   for(let m=0;m<marks.length;m++){
