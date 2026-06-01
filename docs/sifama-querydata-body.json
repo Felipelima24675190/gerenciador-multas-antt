@@ -1,0 +1,46 @@
+{
+  "_comment": "RASCUNHO do body querydata do SIFAMA (Power BI publico). NAO confirmado por replay (replay deu 401 - falta a cadeia de bootstrap; ver sifama-api.md). modelId=1067913 e o Entity/colunas SAO reais (capturados ao vivo 2026-05-31). NAO ha ApplicationContext no body real (eu havia inventado GUIDs antes - REMOVIDOS). Where Contains 'PROGRESSO' em Nome Autuado e a forma que a UI usa p/ filtrar empresa (trocar por 'CRUZEIRO'). Falta Where de DATA. Window max 500.",
+  "version": "1.0.0",
+  "queries": [
+    {
+      "Query": {
+        "Commands": [
+          {
+            "SemanticQueryDataShapeCommand": {
+              "Query": {
+                "Version": 2,
+                "From": [
+                  { "Name": "a", "Entity": "AUTOS DE INFRACAO PASSAGEIROS", "Type": 0 }
+                ],
+                "Select": [
+                  { "Column": { "Expression": { "SourceRef": { "Source": "a" } }, "Property": "Data Infração" }, "Name": "a.Data Infração" },
+                  { "Column": { "Expression": { "SourceRef": { "Source": "a" } }, "Property": "Hora Infração" }, "Name": "a.Hora Infração" },
+                  { "Column": { "Expression": { "SourceRef": { "Source": "a" } }, "Property": "UF Infração" }, "Name": "a.UF Infração" },
+                  { "Column": { "Expression": { "SourceRef": { "Source": "a" } }, "Property": "Município Infração" }, "Name": "a.Município Infração" },
+                  { "Column": { "Expression": { "SourceRef": { "Source": "a" } }, "Property": "Nome Autuado" }, "Name": "a.Nome Autuado" },
+                  { "Column": { "Expression": { "SourceRef": { "Source": "a" } }, "Property": "Placa" }, "Name": "a.Placa" },
+                  { "Column": { "Expression": { "SourceRef": { "Source": "a" } }, "Property": "Número Auto de Infração" }, "Name": "a.Número Auto de Infração" },
+                  { "Column": { "Expression": { "SourceRef": { "Source": "a" } }, "Property": "Código Tipo Infração" }, "Name": "a.Código Tipo Infração" }
+                ],
+                "Where": [
+                  { "Condition": { "Contains": {
+                    "Left": { "Column": { "Expression": { "SourceRef": { "Source": "a" } }, "Property": "Nome Autuado" } },
+                    "Right": { "Literal": { "Value": "'PROGRESSO'" } }
+                  }}}
+                ]
+              },
+              "Binding": {
+                "Primary": { "Groupings": [ { "Projections": [0,1,2,3,4,5,6,7] } ] },
+                "DataReduction": { "DataVolume": 3, "Primary": { "Window": { "Count": 500 } } },
+                "Version": 1
+              },
+              "ExecutionMetricsKind": 1
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "cancelQueries": [],
+  "modelId": 1067913
+}

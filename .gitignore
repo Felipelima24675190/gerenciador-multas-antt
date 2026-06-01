@@ -1,0 +1,52 @@
+# ============================================================
+# .gitignore RIGOROSO — só o código do robô vai pro GitHub.
+# Segredos e DADOS PESSOAIS (CPF, nomes, PDFs reais) NUNCA sobem.
+# ============================================================
+
+# --- SEGREDOS (nunca versionar) ---
+Supabase_token.txt
+.service_role.txt
+.skymail.txt
+.gsheets.json
+.destinatarios.json
+.supabase_url.txt
+*secret*
+*service_role*
+*senha*
+*.cred
+*-service-account*.json
+*credentials*.json
+*.token.txt
+*token*.txt
+.env
+.env.*
+*.key
+
+# --- DADOS PESSOAIS / SENSÍVEIS (CPF, motoristas, multas reais) ---
+amostras_multas/
+docs/multas-planilha.xlsx
+docs/*.pdf
+docs/pdf-multa-mapeamento.md
+Multas ANTT/
+
+# --- Utilitários de desenvolvimento e dumps (têm dados do banco) ---
+_dev/
+*.query.out.json
+.query.out.json
+.query.sql
+.schema.json
+
+# --- Config local / MCP / Claude ---
+.claude/
+.mcp.json
+.mcp_smoketest.mjs
+.read_schema.mjs
+.run_sql.mjs
+.decode_xlsx.mjs
+.inspect_*.py
+
+# --- Node / temporários ---
+node_modules/
+*.bak-*
+.smoke.out.txt
+*.log

@@ -1,0 +1,43 @@
+name: Multas ANTT - Robo diario
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Simular sem gravar (1 = sim)"
+        required: false
+        default: "0"
+      dias:
+        description: "Janela de dias do Agente B"
+        required: false
+        default: "45"
+
+jobs:
+  rodar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar dependencias
+        working-directory: app
+        run: npm ci
+
+      - name: Rodar robo
+        working-directory: app
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SKYMAIL_USER: ${{ secrets.SKYMAIL_USER }}
+          SKYMAIL_PASS: ${{ secrets.SKYMAIL_PASS }}
+          DESTINATARIOS_JSON: ${{ secrets.DESTINATARIOS_JSON }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
+          DIAS: ${{ github.event.inputs.dias || '45' }}
+        run: node src/main.mjs

@@ -1,0 +1,12 @@
+{
+  "name": "gerenciador-operacional-app",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Automacoes diarias (SIFAMA/email/PDF -> Supabase) da Auto Viacao Progresso",
+  "dependencies": {
+    "imapflow": "^1.3.4",
+    "mailparser": "^3.9.9",
+    "pdf-parse": "^1.1.1"
+  }
+}
