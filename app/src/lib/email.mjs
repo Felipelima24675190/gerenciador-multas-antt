@@ -147,9 +147,24 @@ function montarHtml(corpoTexto, cidCard){
     `</body></html>`;
 }
 
+// Verifica se já existe um rascunho com o mesmo assunto (evita duplicar todo dia).
+async function rascunhoJaExiste(client, assunto){
+  let lock;
+  try { lock = await client.getMailboxLock(SKYMAIL.pastaRascunhos); } catch(e){ return false; }
+  try{
+    if(!client.mailbox.exists) return false;
+    const uids = await client.search({ header: { subject: assunto } }, { uid:true });
+    return uids && uids.length > 0;
+  } finally { lock.release(); }
+}
+
 // Cria um RASCUNHO (não envia) na pasta Rascunhos, em HTML, com o CARD de assinatura embutido.
 // email = {para, copia, assunto, corpo}. De: o próprio usuário.
+// Se já existir rascunho com o mesmo assunto, NÃO duplica (retorna {jaExistia:true}).
 export async function criarRascunho(client, de, email){
+  if(await rascunhoJaExiste(client, email.assunto)){
+    return { jaExistia: true, assunto: email.assunto };
+  }
   // nomes com acento → encHeader; e-mail entre <>; ASCII fica como está
   const fmt = (arr)=> (arr||[]).map(p=> p.nome ? `${encHeader(p.nome)} <${p.email}>` : p.email).filter(Boolean).join(", ");
   // carrega o card de assinatura (PNG) se existir
