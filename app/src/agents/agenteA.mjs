@@ -8,6 +8,7 @@ import { bootstrap, coletarAutos, normalizarLinha, SIFAMA_DEFAULT } from "../lib
 import { makeClient } from "../lib/supabase.mjs";
 import { montarEmailsPedido } from "../lib/emailPedido.mjs";
 import { abrir, criarRascunho } from "../lib/email.mjs";
+import { autosNaPlanilha } from "../lib/planilha.mjs";
 
 // período padrão: do 1º dia do mês passado até hoje (datas passadas pelo chamador p/ testabilidade)
 export function periodoPadrao(hoje){
@@ -44,11 +45,20 @@ export async function rodarAgenteA(opts = {}){
     log.push(`SIFAMA ${emp.banco}: ${r.total} autos (período: ${coletados.filter(c=>c.empresa===emp.banco).length})`);
   }
 
-  // 2) diff vs banco
+  // 2) diff vs DUAS fontes: banco (Supabase) + planilha Google (CSV público).
+  // Evita pedir à Fernanda autos que já foram estratificados (estão em qualquer uma).
   const db = makeClient(config.supabase);
-  const existentes = dryRun ? new Set() : await db.autosExistentes();
-  const novos = coletados.filter(c => !existentes.has(c.autoInfracao));
-  log.push(`Novos (não no banco): ${novos.length}`);
+  const existentes = await db.autosExistentes();
+  let naPlanilha = new Set();
+  try {
+    naPlanilha = await autosNaPlanilha();
+    log.push(`Planilha (MULTAS ANTT): ${naPlanilha.size} autos lidos`);
+  } catch(e){
+    log.push(`AVISO: não consegui ler a planilha (${e.message.slice(0,60)}) — diff só com o banco`);
+  }
+  const conhecido = (auto) => existentes.has(auto) || naPlanilha.has(auto);
+  const novos = coletados.filter(c => !conhecido(c.autoInfracao));
+  log.push(`Novos (nem no banco nem na planilha): ${novos.length}`);
 
   // 3) grava 'Aguardando' (idempotente)
   let inseridos = 0;

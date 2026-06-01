@@ -28,6 +28,9 @@ docs/multas-planilha.xlsx
 docs/*.pdf
 docs/pdf-multa-mapeamento.md
 Multas ANTT/
+app/src/assets/
+rodar-robo.bat
+logs/
 
 # --- Utilitários de desenvolvimento e dumps (têm dados do banco) ---
 _dev/

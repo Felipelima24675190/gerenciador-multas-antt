@@ -115,20 +115,81 @@ export async function arquivarEstratificacoes(client, { mover = false } = {}){
   return { arquivados: movidos.length, assuntos: movidos };
 }
 
-// Cria um RASCUNHO (não envia) na pasta Rascunhos. email = {para,copia,assunto,corpo}
-// Monta um .eml mínimo (cabeçalhos + corpo texto). De: o próprio usuário.
+import { readFileSync, existsSync } from "node:fs";
+
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// Codifica um header (Subject etc.) que tenha caracteres não-ASCII como =?UTF-8?B?...?=
+// (RFC 2047). Sem isto, acentos aparecem bugados ("EstratificaÃ§Ã£o").
+function encHeader(s){
+  s = String(s||"");
+  if(/^[\x00-\x7F]*$/.test(s)) return s;            // só ASCII → não precisa
+  return "=?UTF-8?B?" + Buffer.from(s,"utf8").toString("base64") + "?=";
+}
+
+// Monta o corpo HTML: texto do pedido + assinatura (card PNG embutido por cid).
+// O `corpoTexto` pode já terminar com "--\nAtenciosamente," → NÃO duplicar a assinatura:
+// removemos qualquer "--"/"Atenciosamente," do fim e adicionamos UMA vez só.
+function montarHtml(corpoTexto, cidCard){
+  let linhas = String(corpoTexto).split("\n");
+  // remove do fim linhas vazias, "--" e "Atenciosamente," (em qualquer caixa)
+  while(linhas.length){
+    const u = linhas[linhas.length-1].trim();
+    if(u === "" || u === "--" || /^atenciosamente,?$/i.test(u)) linhas.pop();
+    else break;
+  }
+  const corpoHtml = linhas.map(l => esc(l)).join("<br>\n");
+  return `<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head>`+
+    `<body style='font-size: 10pt; font-family: Verdana,Geneva,sans-serif'>`+
+    `<p>${corpoHtml}</p>`+
+    `<p>--<br>Atenciosamente,</p>`+
+    (cidCard ? `<p><img src="cid:${cidCard}" /></p>` : "")+
+    `</body></html>`;
+}
+
+// Cria um RASCUNHO (não envia) na pasta Rascunhos, em HTML, com o CARD de assinatura embutido.
+// email = {para, copia, assunto, corpo}. De: o próprio usuário.
 export async function criarRascunho(client, de, email){
-  const fmt = (arr)=> (arr||[]).map(p=> p.nome ? `${p.nome} <${p.email}>` : p.email).filter(Boolean).join(", ");
-  const headers = [
-    `From: ${de}`,
+  // nomes com acento → encHeader; e-mail entre <>; ASCII fica como está
+  const fmt = (arr)=> (arr||[]).map(p=> p.nome ? `${encHeader(p.nome)} <${p.email}>` : p.email).filter(Boolean).join(", ");
+  // carrega o card de assinatura (PNG) se existir
+  const cardUrl = new URL("../assets/card-assinatura.png", import.meta.url);
+  const temCard = existsSync(cardUrl);
+  const cid = "card-assinatura@adtsa.com.br";
+  const html = montarHtml(email.corpo, temCard ? cid : null);
+
+  const cabes = [
+    `From: ${encHeader(de.replace(/<.*>/,"").trim())} <${(de.match(/<(.*)>/)||[,de])[1]}>`,
     `To: ${fmt(email.para)}`,
     email.copia && email.copia.length ? `Cc: ${fmt(email.copia)}` : null,
-    `Subject: ${email.assunto}`,
+    `Subject: ${encHeader(email.assunto)}`,
     `MIME-Version: 1.0`,
-    `Content-Type: text/plain; charset=utf-8`,
-    `Content-Transfer-Encoding: 8bit`,
-  ].filter(Boolean).join("\r\n");
-  const eml = headers + "\r\n\r\n" + String(email.corpo).replace(/\n/g,"\r\n");
+  ].filter(Boolean);
+
+  let eml;
+  if(temCard){
+    const b64 = readFileSync(cardUrl).toString("base64").replace(/(.{76})/g,"$1\r\n");
+    const bd = "____REL_BOUNDARY____";
+    eml = cabes.concat([
+      `Content-Type: multipart/related; boundary="${bd}"`, ``,
+      `--${bd}`,
+      `Content-Type: text/html; charset=utf-8`,
+      `Content-Transfer-Encoding: 8bit`, ``,
+      html, ``,
+      `--${bd}`,
+      `Content-Type: image/png`,
+      `Content-Transfer-Encoding: base64`,
+      `Content-ID: <${cid}>`,
+      `Content-Disposition: inline; filename="card.png"`, ``,
+      b64,
+      `--${bd}--`, ``,
+    ]).join("\r\n");
+  } else {
+    eml = cabes.concat([
+      `Content-Type: text/html; charset=utf-8`,
+      `Content-Transfer-Encoding: 8bit`, ``, html,
+    ]).join("\r\n");
+  }
   const res = await client.append(SKYMAIL.pastaRascunhos, Buffer.from(eml, "utf8"), ["\\Draft"]);
-  return res; // {uid, ...}
+  return res;
 }

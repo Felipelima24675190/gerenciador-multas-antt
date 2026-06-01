@@ -53,15 +53,24 @@ export async function bootstrap(cfg = SIFAMA_DEFAULT){
   };
 }
 
-// ---- Monta o body do querydata (filtro por empresa exata + paginação) ----
+// ---- Monta o body do querydata (filtro por empresa exata + Data Lavratura não-nula + paginação) ----
 function buildBody(ctx, empresaSifama, restartTokens){
   const q = JSON.parse(JSON.stringify(ctx.proto));
-  q.Where = [{
-    Condition: { In: {
+  // alias da tabela de fatos (Fato FIS Fiscalização) — onde está "Data Lavratura"
+  const fatoAlias = (q.From.find(f => /Fiscaliza/i.test(f.Entity)) || { Name: "f" }).Name;
+  q.Where = [
+    // filtro de empresa
+    { Condition: { In: {
       Expressions: [{ Column: { Expression:{SourceRef:{Source:ctx.autuadoAlias}}, Property:"Nome Autuado" } }],
       Values: [[ { Literal: { Value: "'" + empresaSifama.replace(/'/g,"''") + "'" } } ]]
-    }}
-  }];
+    }}},
+    // ⭐ MESMO filtro escondido do visual: só autos LAVRADOS (Data Lavratura != null).
+    // Sem isto, vinham autos recém-registrados que não aparecem na tela do SIFAMA.
+    { Condition: { Not: { Expression: { In: {
+      Expressions: [{ Column: { Expression:{SourceRef:{Source:fatoAlias}}, Property:"Data Lavratura" } }],
+      Values: [[ { Literal: { Value: "null" } } ]]
+    }}}}}
+  ];
   const primary = { Window: { Count: 500 } };
   if(restartTokens) primary.Window.RestartTokens = restartTokens;
   return {
@@ -134,23 +143,33 @@ function parseDSR(j){
   return { rows: out, restartTokens: rt, hasMore: !!rt };
 }
 
-// ---- Coleta TODOS os autos de uma empresa (com paginação) ----
-export async function coletarAutos(ctx, empresaSifama, { maxPaginas = 50 } = {}){
-  let restart = null, todas = [], paginas = 0, seen = new Set();
+// Prefixo dos autos de PASSAGEIRO REGULAR (escopo do projeto). O filtro por empresa
+// no SIFAMA traz TODAS as categorias (PASLD passageiro, CRGPP carga, FR* fretamento,
+// PASNA passageiro não-autorizado) — só queremos PASLD (a aba "Passageiros/Registros").
+export const PREFIXO_AUTO = "PASLD";
+
+// ---- Coleta os autos PASLD de uma empresa (com paginação) ----
+export async function coletarAutos(ctx, empresaSifama, { maxPaginas = 50, prefixo = PREFIXO_AUTO } = {}){
+  let restart = null, todas = [], paginas = 0, seen = new Set(), ignorados = 0;
   do {
     const j = await postQuery(ctx, empresaSifama, restart);
     const { rows, restartTokens } = parseDSR(j);
     // dedup por número do auto (a paginação pode repetir a linha de fronteira)
-    let novos = 0;
+    let ineditos = 0;  // linhas vistas pela 1ª vez nesta resposta (PASLD ou não)
     for(const r of rows){
       const auto = r["Número Auto de Infração"];
-      if(auto && !seen.has(auto)){ seen.add(auto); todas.push(r); novos++; }
+      if(!auto || seen.has(auto)) continue;
+      seen.add(auto); ineditos++;
+      // FILTRO DE CATEGORIA: só PASLD (passageiro regular). Demais categorias fora do escopo.
+      if(prefixo && !String(auto).toUpperCase().startsWith(prefixo)){ ignorados++; continue; }
+      todas.push(r);
     }
     paginas++;
-    if(!restartTokens || novos === 0) break;
+    // para quando não há mais página OU a página não trouxe nenhuma linha inédita
+    if(!restartTokens || ineditos === 0) break;
     restart = restartTokens;
   } while(paginas < maxPaginas);
-  return { empresa: empresaSifama, total: todas.length, paginas, autos: todas };
+  return { empresa: empresaSifama, total: todas.length, paginas, ignorados, autos: todas };
 }
 
 // ---- Normaliza uma linha do SIFAMA p/ o formato do nosso domínio ----
