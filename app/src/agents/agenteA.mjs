@@ -10,10 +10,11 @@ import { montarEmailsPedido } from "../lib/emailPedido.mjs";
 import { abrir, criarRascunho } from "../lib/email.mjs";
 import { autosNaPlanilha } from "../lib/planilha.mjs";
 
-// período padrão: do 1º dia do mês passado até hoje (datas passadas pelo chamador p/ testabilidade)
-export function periodoPadrao(hoje){
+// Período: do 1º dia de (mesesAtras) meses atrás até hoje. Default 2 = mês atual + 2 anteriores
+// (cobre infrações antigas que só foram LAVRADAS recentemente — ex.: multa de abril lançada em maio).
+export function periodoPadrao(hoje, mesesAtras = 2){
   const fim = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()));
-  const ini = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth()-1, 1));
+  const ini = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth()-mesesAtras, 1));
   return { ini, fim };
 }
 function dentro(brDate, ini, fim){
@@ -22,16 +23,17 @@ function dentro(brDate, ini, fim){
   return d >= ini && d <= fim;
 }
 
-// opts: { hoje:Date, dryRun:bool (não grava/rascunha), criarRascunhos:bool }
+// opts: { hoje:Date, dryRun:bool, criarRascunhos:bool, mesesAtras:int (default 2 = atual+2 anteriores) }
 export async function rodarAgenteA(opts = {}){
   const hoje = opts.hoje || new Date();
   const dryRun = !!opts.dryRun;
+  const mesesAtras = opts.mesesAtras != null ? opts.mesesAtras : 2;
   const faltas = checar(["supabase"]);
   if(faltas.length && !dryRun) throw new Error("Faltam credenciais: " + faltas.join(", "));
 
   const log = [];
-  const { ini, fim } = periodoPadrao(hoje);
-  log.push(`Período: ${ini.toISOString().slice(0,10)} → ${fim.toISOString().slice(0,10)}`);
+  const { ini, fim } = periodoPadrao(hoje, mesesAtras);
+  log.push(`Período (${mesesAtras+1} meses): ${ini.toISOString().slice(0,10)} → ${fim.toISOString().slice(0,10)}`);
 
   // 1) coleta SIFAMA (2 empresas)
   const ctx = await bootstrap();

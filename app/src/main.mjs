@@ -26,6 +26,9 @@ async function main(){
   const dryRun = env("DRY_RUN","") === "1";
   const so = (env("SO_AGENTE","") || "").toUpperCase();
   const dias = parseInt(env("DIAS","45"), 10) || 45;
+  // janela do Agente A: mês atual + N anteriores (default 2 = 3 meses). Cobre multas
+  // antigas lavradas recentemente (ex.: infração de abril lançada em maio).
+  const mesesAtras = parseInt(env("MESES_ATRAS","2"), 10);
   // rascunho automático LIGADO por padrão (rascunho ≠ envio; usuário revisa e envia).
   // p/ desligar: CRIAR_RASCUNHO=0
   const criarRascunhos = env("CRIAR_RASCUNHO","1") !== "0";
@@ -42,7 +45,7 @@ async function main(){
   if(so !== "B"){
     console.log("\n--- AGENTE A (coleta SIFAMA) ---");
     try{
-      const a = await rodarAgenteA({ hoje, dryRun, criarRascunhos });
+      const a = await rodarAgenteA({ hoje, dryRun, criarRascunhos, mesesAtras });
       a.log.forEach(l=>console.log("  "+l));
       console.log(`  RESUMO A: novos=${a.novos} inseridos=${a.inseridos} emails=${a.emails.length} rascunhos=${a.rascunhos.length}`);
     }catch(e){ falhou = true; console.error("  FALHA Agente A:", e.message); }
